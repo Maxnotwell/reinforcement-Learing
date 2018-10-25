@@ -19,6 +19,7 @@ args = parser.parse_args()
 
 env = gym.make('CartPole-v0')
 
+
 class Policy(nn.Module):
     def __init__(self):
         super(Policy, self).__init__()
@@ -35,9 +36,11 @@ class Policy(nn.Module):
 
         return out
 
+
 policy = Policy()
 optimizer = optim.Adam(policy.parameters(), lr=args.lr)
 eps = np.finfo(np.float32).eps.item()
+
 
 def select_action(state):
     state = torch.from_numpy(state).float().unsqueeze(0)
@@ -47,19 +50,14 @@ def select_action(state):
     policy.prob_log.append(m.log_prob(action))
     return action.item()
 
+
 def finish_episode():
     A = 0
     policy_loss = []
-    B = 0
     advantage = []
-    rewards = []
     for r in policy.reward_log[::-1]:
         A = r + args.gamma * A
         advantage.insert(0, A)
-
-    # for r in policy.reward_log[:]:
-    #     A = r + args.gamma * A
-    #     advantage.append(A)
 
     advantage = torch.tensor(advantage)
     advantage = (advantage - advantage.mean()) / (advantage.std() + eps)
@@ -73,6 +71,7 @@ def finish_episode():
     optimizer.step()
     del policy.reward_log[:]
     del policy.prob_log[:]
+
 
 def main():
     current_reward = 10
@@ -96,6 +95,7 @@ def main():
             print("Solved! Running reward is now {} and "
                   "the last episode runs to {} time steps!".format(current_reward, j))
             break
+
 
 if __name__ == '__main__':
     main()
