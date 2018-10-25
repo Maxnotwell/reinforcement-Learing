@@ -25,8 +25,8 @@ class Policy(nn.Module):
         super(Policy, self).__init__()
         self.fc1 = nn.Linear(4, 128)
         self.fc2 = nn.Linear(128, 2)
-        self.prob_log = []
-        self.reward_log = []
+        self.saved_log_prob = []
+        self.saved_rewards = []
 
     def forward(self, input):
         out = self.fc1(input)
@@ -43,34 +43,35 @@ eps = np.finfo(np.float32).eps.item()
 
 
 def select_action(state):
+    # state = torch.from_numpy(state).float().unsqueeze(0)
     state = torch.from_numpy(state).float().unsqueeze(0)
-    prob = policy(state)
-    m = Categorical(prob)
+    probs = policy(state)
+    m = Categorical(probs)
     action = m.sample()
-    policy.prob_log.append(m.log_prob(action))
+    policy.saved_log_prob.append(m.log_prob(action))
     return action.item()
 
 
 def finish_episode():
-    A = 0
+    R = 0
     policy_loss = []
-    advantage = []
-    for r in policy.reward_log[::-1]:
-        A = r + args.gamma * A
-        advantage.insert(0, A)
+    rewards = []
+    for r in policy.saved_rewards[::-1]:
+        R = r + args.gamma * R
+        rewards.insert(0, R)
 
-    advantage = torch.tensor(advantage)
-    advantage = (advantage - advantage.mean()) / (advantage.std() + eps)
+    rewards = torch.tensor(rewards)
+    rewards = (rewards - rewards.mean()) / (rewards.std() + eps)
 
-    for prob, reward in zip(policy.prob_log, advantage):
-        policy_loss.append(-prob * reward)
+    for log_prob, reward in zip(policy.saved_log_prob, rewards):
+        policy_loss.append(-log_prob * reward)
 
     optimizer.zero_grad()
     policy_loss = torch.cat(policy_loss).sum()
     policy_loss.backward()
     optimizer.step()
-    del policy.reward_log[:]
-    del policy.prob_log[:]
+    del policy.saved_rewards[:]
+    del policy.saved_log_prob[:]
 
 
 def main():
@@ -82,7 +83,7 @@ def main():
             state, reward, done, _ = env.step(action)
             if args.render:
                 env.render()
-            policy.reward_log.append(reward)
+            policy.saved_rewards.append(reward)
             if done:
                 break
 
